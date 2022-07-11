@@ -811,7 +811,7 @@ install_snapshot_controller() {
           modified="$(cat "$i" | while IFS= read -r line; do
               nocomments="$(echo "$line" | sed -e 's/ *#.*$//')"
               if echo "$nocomments" | grep -q '^[[:space:]]*image:[[:space:]]*'; then
-                  # Split 'image: registry.k8s.io/sig-storage/snapshot-controller:v3.0.0'
+                  # Split 'image: k8s.gcr.io/sig-storage/snapshot-controller:v3.0.0'
                   # into image (snapshot-controller:v3.0.0),
                   # name (snapshot-controller),
                   # tag (v3.0.0).
@@ -912,11 +912,11 @@ patch_kubernetes () {
     local source="$1" target="$2"
 
     if [ "${CSI_PROW_DRIVER_CANARY}" = "canary" ]; then
-        # We cannot replace registry.k8s.io/sig-storage with gcr.io/k8s-staging-sig-storage because
+        # We cannot replace k8s.gcr.io/sig-storage with gcr.io/k8s-staging-sig-storage because
         # e2e.test does not support it (see test/utils/image/manifest.go). Instead we
         # invoke the e2e.test binary with KUBE_TEST_REPO_LIST set to a file that
         # overrides that registry.
-        find "$source/test/e2e/testing-manifests/storage-csi/mock" -name '*.yaml' -print0 | xargs -0 sed -i -e 's;registry.k8s.io/sig-storage/\(.*\):v.*;registry.k8s.io/sig-storage/\1:canary;'
+        find "$source/test/e2e/testing-manifests/storage-csi/mock" -name '*.yaml' -print0 | xargs -0 sed -i -e 's;k8s.gcr.io/sig-storage/\(.*\):v.*;k8s.gcr.io/sig-storage/\1:canary;'
         cat >"$target/e2e-repo-list" <<EOF
 sigStorageRegistry: gcr.io/k8s-staging-sig-storage
 EOF
@@ -1253,8 +1253,9 @@ main () {
             focus="($focus|CSI.mock.volume)"
         fi
 
-        if tests_need_non_alpha_cluster; then
-            start_cluster || die "starting the non-alpha cluster failed"
+        if tests_need_non_alpha_cluster  && [ "${CSI_PROW_E2E_GATES[_LATEST]}" ]; then
+            # Need to (re)create the cluster.
+            start_cluster "${CSI_PROW_E2E_GATES[_LATEST]}" || die "starting non alpha cluster failed"
 
             # Install necessary snapshot CRDs and snapshot controller
             install_snapshot_crds
